@@ -1,2 +1,2 @@
 # HTTPS-Chunking
-server-seide php &amp; js  HTTPS chunking
+server-side php &amp; client-side js,html
