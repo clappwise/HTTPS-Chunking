@@ -66,7 +66,7 @@ if ($chunkNumber == $totalChunks) {
                     formData.append('totalChunks', totalChunks);
                     formData.append('uniqueKey', 'your_unique_key'); // Replace with a unique identifier
 
-                    fetch('upload.php', {
+                    fetch('main.php', {
                         method: 'POST',
                         body: formData
                     })
