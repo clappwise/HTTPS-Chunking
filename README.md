@@ -1,2 +1,4 @@
 # HTTPS-Chunking
-server-side php &amp; client-side js,html
+server-side PHP &amp; client-side JS,HTML
+
+no third-party required, just plug n' play the code
