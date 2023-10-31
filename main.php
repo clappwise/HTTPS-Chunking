@@ -1,33 +1,42 @@
 <?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $chunk = $_POST['chunk']; // Received chunk
+    $chunkNumber = $_POST['chunkNumber']; // Chunk number
+    $totalChunks = $_POST['totalChunks']; // Total number of chunks
+    $uniqueKey = $_POST['uniqueKey']; // Identifier for the file
 
+    $tempUploadPath = 'temp_upload_directory/' . $uniqueKey; // Temporary folder
+    $finalUploadPath = 'final_upload_directory/' . $uniqueKey; // Permanent folder
 
-$chunk = $_POST['chunk']; // Received chunk
-$chunkNumber = $_POST['chunkNumber']; // Chunk number
-$totalChunks = $_POST['totalChunks']; // Total number of chunks
-$uniqueKey = $_POST['uniqueKey']; // Identifier for the file
-
-$uploadPath = 'your_upload_directory/' . $uniqueKey;
-
-// Save the chunk
-file_put_contents("$uploadPath/$chunkNumber", $chunk);
-
-// Check if all chunks have been received
-if ($chunkNumber == $totalChunks) {
-    // All chunks received, assemble the file
-    $outputFile = 'final_upload_directory/' . $uniqueKey;
-
-    for ($i = 1; $i <= $totalChunks; $i++) {
-        $chunkData = file_get_contents("$uploadPath/$i", FILE_BINARY);
-        file_put_contents($outputFile, $chunkData, FILE_APPEND);
+    if (!file_exists($tempUploadPath)) {
+        mkdir($tempUploadPath, 0777, true);
     }
 
-    // Clean up temporary chunks
-    for ($i = 1; $i <= $totalChunks; $i++) {
-        unlink("$uploadPath/$i");
-    }
+    file_put_contents("$tempUploadPath/$chunkNumber", $chunk);
 
-    // File is now fully assembled and saved in $outputFile
+    // Check if all chunks have been received
+    if ($chunkNumber == $totalChunks) {
+        // All chunks received, assemble the file
+        $outputFile = fopen("$finalUploadPath", 'w');
+
+        for ($i = 1; $i <= $totalChunks; $i++) {
+            $chunkData = file_get_contents("$tempUploadPath/$i");
+            fwrite($outputFile, $chunkData);
         }
+
+        fclose($outputFile);
+
+        // Clean up temporary chunks
+        for ($i = 1; $i <= $totalChunks; $i++) {
+            unlink("$tempUploadPath/$i");
+        }
+
+        // File is now fully assembled and saved in $finalUploadPath
+        echo json_encode(['message' => 'Upload Complete']);
+    } else {
+        echo json_encode(['message' => 'Chunk Received']);
+    }
+}
 
 ? >
 
