@@ -1,123 +1,99 @@
 <?php
-// Define the directory where you want to save the video chunks
-$uploadDirectory = 'videos/';
 
-// Ensure the 'chunk' key is present in the POST data
-if (!isset($_FILES['chunk']['name'])) {
-    die('Invalid request');
-}
 
-$chunk = $_FILES['chunk'];
-$chunkSize = (int) $_SERVER['HTTP_CONTENT_LENGTH'];
+$chunk = $_POST['chunk']; // Received chunk
+$chunkNumber = $_POST['chunkNumber']; // Chunk number
+$totalChunks = $_POST['totalChunks']; // Total number of chunks
+$uniqueKey = $_POST['uniqueKey']; // Identifier for the file
 
-// Ensure the chunk is not empty
-if ($chunkSize === 0) {
-    die('Empty chunk');
-}
+$uploadPath = 'your_upload_directory/' . $uniqueKey;
 
-// Get the index and total chunks from HTTP headers
-$chunkIndex = (int) $_SERVER['HTTP_X_CHUNK_INDEX'];
-$totalChunks = (int) $_SERVER['HTTP_X_CHUNK_TOTAL'];
-
-// Create the target file name
-$targetFileName = $uploadDirectory . basename($_SERVER['HTTP_X_FILE_NAME']);
-
-// Append the chunk to the target file
-if ($chunkIndex === 0) {
-    // If this is the first chunk, create a new file
-    $fileHandle = fopen($targetFileName, 'wb');
-} else {
-    // If not the first chunk, append to the existing file
-    $fileHandle = fopen($targetFileName, 'ab');
-}
-
-if (!$fileHandle) {
-    die('Unable to open the target file');
-}
-
-// Read and write the chunk
-if ($chunk && $fileHandle) {
-    while (!feof($chunk)) {
-        fwrite($fileHandle, fread($chunk, 8192));
-    }
-}
-
-fclose($fileHandle);
+// Save the chunk
+file_put_contents("$uploadPath/$chunkNumber", $chunk);
 
 // Check if all chunks have been received
-if ($chunkIndex === $totalChunks - 1) {
-    echo 'Upload completed successfully';
-} else {
-    echo 'Chunk uploaded';
-}
+if ($chunkNumber == $totalChunks) {
+    // All chunks received, assemble the file
+    $outputFile = 'final_upload_directory/' . $uniqueKey;
 
-?>
+    for ($i = 1; $i <= $totalChunks; $i++) {
+        $chunkData = file_get_contents("$uploadPath/$i", FILE_BINARY);
+        file_put_contents($outputFile, $chunkData, FILE_APPEND);
+    }
+
+    // Clean up temporary chunks
+    for ($i = 1; $i <= $totalChunks; $i++) {
+        unlink("$uploadPath/$i");
+    }
+
+    // File is now fully assembled and saved in $outputFile
+        }
+
+? >
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Video Upload</title>
-    <link rel="stylesheet" type="text/css" href="path/to/dropzone.min.css">
+    <title>Chunked File Upload</title>
 </head>
 <body>
-       <form action="" method="post" enctype="multipart/form-data">
-     
-    <div>
-    <input type='file' name='file' class="form-control" /><br>
-    </div>
-    
-    </form>
+    <input type="file" id="fileInput">
+    <button id="uploadButton">Upload</button>
+    <progress id="progressBar" max="100" value="0"></progress>
+    <div id="status"></div>
 
-  <script>
-        // Function to upload video in chunks
-        function uploadVideoChunked() {
-            const fileInput = document.querySelector('input[type="file"]');
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadButton = document.getElementById('uploadButton');
+        const progressBar = document.getElementById('progressBar');
+        const status = document.getElementById('status');
+
+        uploadButton.addEventListener('click', () => {
             const file = fileInput.files[0];
-            const chunkSize = 1024 * 1024; // 1MB chunks
+            if (file) {
+                const chunkSize = 1024 * 1024; // 1MB chunks (adjust as needed)
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                let currentChunk = 0;
 
-            // Calculate the total number of chunks
-            const totalChunks = Math.ceil(file.size / chunkSize);
-            let currentChunk = 0;
+                function uploadChunk() {
+                    const start = currentChunk * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
 
-            // Function to send a chunk of the file to the server
-            function sendChunk() {
-                const start = currentChunk * chunkSize;
-                const end = Math.min(start + chunkSize, file.size);
-                const chunk = file.slice(start, end);
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('chunkNumber', currentChunk + 1);
+                    formData.append('totalChunks', totalChunks);
+                    formData.append('uniqueKey', 'your_unique_key'); // Replace with a unique identifier
 
-                // Create a FormData object and append the chunk
-                const formData = new FormData();
-                formData.append('chunk', chunk);
-
-                // Send the chunk to the server using AJAX
-                $.ajax({
-                    url: 'main.php', // Replace with your server endpoint
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function (response) {
-                        console.log(`Uploaded chunk ${currentChunk + 1} of ${totalChunks}`);
+                    fetch('upload.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
                         currentChunk++;
 
-                        // Continue uploading the next chunk
+                        const progress = (currentChunk / totalChunks) * 100;
+                        progressBar.value = progress;
+                        status.textContent = `Uploading... ${progress.toFixed(2)}%`;
+
                         if (currentChunk < totalChunks) {
-                            sendChunk();
+                            uploadChunk();
                         } else {
-                            console.log('Upload complete');
+                            progressBar.value = 100;
+                            status.textContent = 'Upload Complete';
                         }
-                    }
-                });
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        status.textContent = 'Upload Failed';
+                    });
+                }
+
+                uploadChunk();
             }
-
-            // Start uploading the first chunk
-            sendChunk();
-        }
+        });
     </script>
-
 </body>
 </html>
-
-
-
- 
